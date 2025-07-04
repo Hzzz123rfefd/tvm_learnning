@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import shutil
+import numpy as np
 import torch
 import tvm
 import onnx
@@ -12,7 +13,7 @@ from tvm.relax.frontend.onnx import from_onnx
 from tvm.ir import IRModule
 from tvm.runtime import Executable
 from tvm.relax import get_pipeline
-from typing import List
+from typing import List, Union
 from typing import Dict, List, Tuple
 
 from tvm_common.utils import torch2onnx, gc_collect, compare_ndarray
@@ -224,12 +225,12 @@ class TVMConvert:
     def opt_mod(self, mod: IRModule, output:str, meta_schedule: bool = False, pipeline_name: str = None, dynamic_batch_size: bool = False):
         if meta_schedule:
             assert pipeline_name is None, "When meta_schedule is True, pipeline_name must be None."
-        else:
-            assert pipeline_name is not None, "When meta_schedule is False, pipeline_name must be provided."
+        # else:
+        #     assert pipeline_name is not None, "When meta_schedule is False, pipeline_name must be provided."
 
-        if not meta_schedule:
+        if pipeline_name:
             mod = relax.get_pipeline(pipeline_name)(mod)
-        else:
+        elif meta_schedule:
             assert (
                 not dynamic_batch_size
             ), "Dynamic batch size is not supported for meta-schedule"
@@ -238,10 +239,13 @@ class TVMConvert:
             work_dir = os.path.join(output, "tuning_logs")
             mod = get_pipeline(
                 "static_shape_tuning",
-                total_trials=4,    # should be 8000, it waste time
+                total_trials = 4,    # should be 8000, it waste time
                 target = self.target,
                 work_dir=work_dir,
             )(mod)
+        else:
+            mod = relax.transform.LegalizeOps()(mod)
+            mod= tvm.tir.transform.DefaultGPUSchedule()(mod) 
         return mod
 
     def save_mod(self, ex: Executable, mod_path: str):
@@ -260,9 +264,18 @@ class TVMConvert:
         logging.info(f"Saving param {func_name} to {param_path}")
         tvm.runtime.save_param_dict_to_file(param_dict, param_path)
 
-    def inference(self, ex: Executable, params:  List[tvm.nd.NDArray], x_tvm: tvm.ir.container.Array):
+    def inference(self, ex: Executable, params: Dict[str, List[Union[np.ndarray, tvm.nd.NDArray]]], x_tvm: tvm.nd.NDArray):
+        x_tvm.copyto(self.dev)
+
+        for func_name, param_list in params.items():
+            logging.info(f"Converting params of {func_name} to target device: {self.dev}")
+            for i in range(len(param_list)):
+                param_list[i] = tvm.nd.array(param_list[i], self.dev)
+
         vm = relax.VirtualMachine(ex, self.dev)
+
         y_tvm = vm["main"](x_tvm, params["main"])
+
         if isinstance(y_tvm, tvm.ir.container.Array):
             y_tvm = y_tvm[0].numpy()
         elif isinstance(y_tvm, tvm.nd.NDArray):

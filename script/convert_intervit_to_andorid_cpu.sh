@@ -1,5 +1,7 @@
 python convert/convert_pytorch_demo.py \
-    --output ./output_pytroch_andorid_cpu \
+    --output ./output_intervit_andorid_cpu \
+    --pipeline internvit_opt \
+    --inject_hyper_params convert/internvit_hyper_params.json \
     --backend llvm \
     --cross_sm sm_75 \
     --cross_host "llvm -mtriple=aarch64-linux-android" \

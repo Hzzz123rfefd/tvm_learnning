@@ -1,0 +1,5 @@
+{
+    "patch_size": {"type": "int32", "value": 14},
+    "force_image_width": {"type": "int32", "value": 224},
+    "force_image_height": {"type": "int32", "value": 224}
+}
