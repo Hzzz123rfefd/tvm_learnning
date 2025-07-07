@@ -241,7 +241,7 @@ class TVMConvert:
                 "static_shape_tuning",
                 total_trials = 4,    # should be 8000, it waste time
                 target = self.target,
-                work_dir=work_dir,
+                work_dir = work_dir,
             )(mod)
         else:
             mod = relax.transform.LegalizeOps()(mod)
@@ -263,16 +263,21 @@ class TVMConvert:
             param_dict[f"{i}"] = params[func_name][i]
         logging.info(f"Saving param {func_name} to {param_path}")
         tvm.runtime.save_param_dict_to_file(param_dict, param_path)
+    
+    def load_params(self, param_path: str)-> Dict[str, List[tvm.nd.NDArray]]:
+        with open(param_path, "rb") as f:
+            loaded_bytes = f.read()
+        param_dict = tvm.runtime.load_param_dict(loaded_bytes)
+        params = [tvm.nd.array(param_dict[str(i)]) for i in range(len(param_dict))]
+        return {"main": params}
 
     def inference(self, ex: Executable, params: Dict[str, List[Union[np.ndarray, tvm.nd.NDArray]]], x_tvm: tvm.nd.NDArray):
-        x_tvm.copyto(self.dev)
-
+        x_tvm = tvm.nd.array(x_tvm, self.dev)
+        vm = relax.VirtualMachine(ex, self.dev)
         for func_name, param_list in params.items():
             logging.info(f"Converting params of {func_name} to target device: {self.dev}")
             for i in range(len(param_list)):
                 param_list[i] = tvm.nd.array(param_list[i], self.dev)
-
-        vm = relax.VirtualMachine(ex, self.dev)
 
         y_tvm = vm["main"](x_tvm, params["main"])
 

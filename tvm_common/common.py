@@ -1,6 +1,9 @@
 import argparse
+import logging
 import os
 
+import tvm
+from tvm import relax
 from tvm_common.tvm_convert import TVMConvert
 
 def args_sanity_check(args):
@@ -117,3 +120,25 @@ def convert(args, model, example_args):
         dynamic_batch_size = args.dynamic_batch_size, 
         fp16 = args.fp16
     )
+
+def inference(args, x):
+    tvm_convert = TVMConvert(
+        args.backend,
+        args.cross_sm, 
+        args.cross_host, 
+        args.cross_cc,
+    )
+    model_path = os.path.join(args.output, f"{args.output}.so")
+    weight_path = os.path.join(args.output, f"{args.output}.bin")
+
+
+    logging.info(f"load tvm module")
+    rt_mod = tvm.runtime.load_module(model_path)
+
+    logging.info(f"load weight")
+    param_dict = tvm_convert.load_params(weight_path)
+
+    logging.info(f"inference")
+    x_tvm = tvm.nd.array(x)
+    y_tvm = tvm_convert.inference(rt_mod, param_dict, x_tvm)
+    return y_tvm

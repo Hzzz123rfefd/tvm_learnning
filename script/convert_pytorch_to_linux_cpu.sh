@@ -1,3 +1,3 @@
 python convert/convert_pytorch_demo.py \
---output ./output_pytroch_linux_llvm \
+--output ./output_pytroch_linux_cpu \
 --backend llvm
