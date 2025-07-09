@@ -1,0 +1,8 @@
+numpy
+torch
+onnx
+transformers
+einops
+timm
+accelerate
+zstd

@@ -1,12 +1,6 @@
 import logging
-import types
 import torch
-from transformers import AutoModel,AutoConfig
-import math
-import numpy as np
-import onnx
 import logging
-import gc
 import torch.nn as nn
 
 from tvm_common import get_common_parser, convert

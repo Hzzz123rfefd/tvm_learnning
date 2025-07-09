@@ -143,11 +143,11 @@ class TVMConvert:
         if self.cross_compiling:
             target_config = {
                 "kind": self.backend,
-                "host": self.cross_host,
+                "host": self.cross_host
             }
             target = tvm.target.Target(target_config)
         else:
-            target = tvm.target.Target(self.backend)
+            target = tvm.target.Target.from_device(self.dev)
         return target
 
     def get_ir_module_from_onnx_model(self, onnx_model_path: str)-> IRModule:
